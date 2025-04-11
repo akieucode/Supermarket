@@ -20,8 +20,6 @@ class App(tk.Tk):
         
         self.inventoryPage = InventoryPage(self)
 
-       
-
 # Display homePage first
         self.homePage.grid(row=0, column=0, sticky="nsew")  
     
@@ -68,6 +66,9 @@ class ProductsPage(tk.Frame):
         self.productsTable.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
 
         self.DisplayProducts("Supermarket.db")
+
+        button_add_product = tk.Button(self, text="Add Product", command=self.addProductsWindow)
+        button_add_product.grid(row=1, column=1, pady=0, padx=10, sticky="nsew")
         
 # Function to display the Products
     def DisplayProducts(self, db_file):
@@ -108,8 +109,30 @@ class ProductsPage(tk.Frame):
         con.close() # close connection
 
     # display the table
-        tree.pack(expand=True, fill="both")
-    
+        tree.pack(pady=0, padx=0, expand=True, fill="both")
+
+    def addProductsWindow(self):
+    # open separate window on top of current    
+        add_product_window = tk.Toplevel(self)
+        add_product_window.title("Add New Product")
+        add_product_window.geometry("400x300")
+
+        tk.Label(add_product_window, text="product_id").pack(pady=5)
+        enter_pid = tk.Entry(add_product_window)
+        enter_pid.pack()
+
+        tk.Label(add_product_window, text="product_name").pack(pady=5)
+        enter_pname = tk.Entry(add_product_window)
+        enter_pname.pack()
+
+        tk.Label(add_product_window, text="price").pack(pady=5)
+        enter_price = tk.Entry(add_product_window)
+        enter_price.pack()
+
+        tk.Label(add_product_window, text="category name").pack(pady=5)
+        enter_category = tk.Entry(add_product_window)
+        enter_category.pack()
+
 
 class InventoryPage(tk.Frame):
     def __init__(self, master):
