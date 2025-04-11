@@ -1,6 +1,7 @@
 import sqlite3
 import tkinter as tk
 from tkinter import ttk # for displaying table
+from tkinter import messagebox  # displaying error messages
 
 con = sqlite3.connect("Supermarket.db")
 cursor = con.cursor()
@@ -10,7 +11,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Supermarket Inventory Management")  # title of window
-        self.geometry("1300x800")   # size of window
+        self.geometry("1100x500")   # size of window
         
 # Create the page frames
         self.homePage = HomePage(self)
@@ -69,7 +70,7 @@ class ProductsPage(tk.Frame):
 
         button_add_product = tk.Button(self, text="Add Product", command=self.addProductsWindow)
         button_add_product.grid(row=1, column=1, pady=0, padx=10, sticky="nsew")
-        
+
 # Function to display the Products
     def DisplayProducts(self, db_file):
     # connect to database and create pointer to call SQL queries
@@ -80,9 +81,9 @@ class ProductsPage(tk.Frame):
         cursor.execute("""
             SELECT 
                 Products.product_id, 
-                Products.name AS product_name, 
+                Products.product_name, 
                 Products.price AS price, 
-                Categories.name AS category_name, 
+                Categories.category_name, 
                 Categories.department
             FROM Products
             JOIN Categories 
@@ -117,21 +118,72 @@ class ProductsPage(tk.Frame):
         add_product_window.title("Add New Product")
         add_product_window.geometry("400x300")
 
-        tk.Label(add_product_window, text="product_id").pack(pady=5)
-        enter_pid = tk.Entry(add_product_window)
-        enter_pid.pack()
-
         tk.Label(add_product_window, text="product_name").pack(pady=5)
-        enter_pname = tk.Entry(add_product_window)
-        enter_pname.pack()
+        pname_input = tk.Entry(add_product_window)
+        pname_input.pack()
 
         tk.Label(add_product_window, text="price").pack(pady=5)
-        enter_price = tk.Entry(add_product_window)
-        enter_price.pack()
+        pprice_input = tk.Entry(add_product_window)
+        pprice_input.pack()
 
-        tk.Label(add_product_window, text="category name").pack(pady=5)
-        enter_category = tk.Entry(add_product_window)
-        enter_category.pack()
+        tk.Label(add_product_window, text="category_name").pack(pady=5)
+        cname_input = tk.Entry(add_product_window)
+        cname_input.pack()
+
+        tk.Label(add_product_window, text="department").pack(pady=5)
+        department_input = tk.Entry(add_product_window)
+        department_input.pack()
+
+    # inserting new data into the db
+        def confirmAddProduct():
+            # getter function to receive user input
+            product_name = pname_input.get()
+            price = pprice_input.get()
+            category_name = cname_input.get()
+            department = department_input.get()
+
+            # condition to check if all fields are filled out
+            if product_name and price and category_name and department:
+                try:
+                    con = sqlite3.connect("Supermarket.db")
+                    cursor = con.cursor()
+
+                # look for the category to see if it exists
+                    cursor.execute("SELECT category_id FROM Categories WHERE category_name = ?", (category_name,))
+                    result = cursor.fetchone() # fetch first matching result
+                    if result:
+                        category_id = result[0] # get the existing category_id because category is found
+                    else: # insert new category because it doesn't exist                                     
+                        cursor.execute(
+                            "INSERT INTO Categories (category_name, department) VALUES (?,?)",
+                            (category_name, department))
+                        con.commit()
+
+                # fetch new category id
+                        cursor.execute("SELECT category_id FROM Categories WHERE category_name = ?", (category_name,))
+                        category_id = cursor.fetchone()[0]  # get the only result, extract tuple and hold the actual category_id value
+                # insert new product into Products table that links with the category_id        
+                    cursor.execute(
+                        "INSERT INTO Products (product_name, price, category_id) VALUES (?,?,?)",
+                        (product_name, float(price), category_id)
+                    )
+                    con.commit()
+                    con.close()
+
+                    add_product_window.destroy()
+
+        # destroy current windows and reopen to refresh pages
+                    self.productsTable.destroy()
+                    self.productsTable=tk.Frame(self)
+                    self.productsTable.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+                    self.DisplayProducts("Supermarket.db")
+                except Exception as e:
+                    tk.messagebox.showerror("Error", str(e))
+            else:
+                messagebox.showerror("Error")
+
+        tk.Button(add_product_window, text="Add", command=confirmAddProduct).pack(pady=20)
+                                
 
 
 class InventoryPage(tk.Frame):
