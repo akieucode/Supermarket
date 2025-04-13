@@ -11,7 +11,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Supermarket Inventory Management")  # title of window
-        self.geometry("1100x500")   # size of window
+        self.geometry("1200x500")   # size of window
         
 # Create the page frames
         self.homePage = HomePage(self)
@@ -71,8 +71,15 @@ class ProductsPage(tk.Frame):
         button_add_product = tk.Button(self, text="Add Product", command=self.addProductsWindow)
         button_add_product.grid(row=1, column=1, pady=0, padx=10, sticky="nsew")
 
+        button_delete_product = tk.Button(self, text="Delete Product", fg="red", command=self.deleteProduct)
+        button_delete_product.grid(row=1, column=2, pady=0, padx=0, sticky="nsew")
+
 # Function to display the Products
     def DisplayProducts(self, db_file):
+    # clear old content for any changes in database
+        for widget in self.productsTable.winfo_children():
+            widget.destroy()
+
     # connect to database and create pointer to call SQL queries
         con = sqlite3.connect(db_file)  
         cursor = con.cursor()
@@ -97,20 +104,20 @@ class ProductsPage(tk.Frame):
         columns = [description[0] for description in cursor.description]
         
     # create treeview widget
-        tree = ttk.Treeview(self.productsTable, columns=columns, show="headings")
+        self.tree = ttk.Treeview(self.productsTable, columns=columns, show="headings")
+
     # column headers
-    
         for col in columns:
-            tree.heading(col, text=col)
-            tree.column(col, anchor="center")
+            self.tree.heading(col, text=col)
+            self.tree.column(col, anchor="center")
     # insert rows, data from database
         for row in rows:
-            tree.insert("", "end", values=row)
+            self.tree.insert("", "end", values=row)
 
         con.close() # close connection
 
     # display the table
-        tree.pack(pady=0, padx=0, expand=True, fill="both")
+        self.tree.pack(pady=0, padx=0, expand=True, fill="both")
 
     def addProductsWindow(self):
     # open separate window on top of current    
@@ -183,7 +190,28 @@ class ProductsPage(tk.Frame):
                 messagebox.showerror("Error")
 
         tk.Button(add_product_window, text="Add", command=confirmAddProduct).pack(pady=20)
-                                
+
+    # delete selected product
+    def deleteProduct(self):
+        selected = self.tree.selection()    # selected items from the table
+        if not selected:
+            return
+        
+        item = self.tree.item(selected[0])  # get the data values from the first selected item
+        product_id = item['values'][0]      # get the tuple of the data values in the first column (where product_id is stored)
+
+        confirm = messagebox.askyesno("Delete Product", f"Are you sure you want to delete this product?") # display message box for confirmation
+        if not confirm: # do nothing and close the message box
+            return
+
+        # delete data from the db
+        con = sqlite3.connect("Supermarket.db")
+        cursor = con.cursor()
+        cursor.execute("DELETE FROM Products WHERE product_id = ?", (product_id,))
+        con.commit()
+        con.close()
+
+        self.DisplayProducts("Supermarket.db")  # refresh the table
 
 
 class InventoryPage(tk.Frame):
