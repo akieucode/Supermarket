@@ -11,7 +11,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Supermarket Inventory Management")  # title of window
-        self.geometry("1200x500")   # size of window
+        self.geometry("1050x500")   # size of window
         
 # Create the page frames
         self.homePage = HomePage(self)
@@ -43,14 +43,14 @@ class HomePage(tk.Frame):
     def __init__(self, master):
         super().__init__(master)
         label = tk.Label (self, text= "Home", font=("Helvetica", 24, "bold"))  
-        label.grid(row=0, column=0, pady=10, padx=400, sticky="nsew")
+        label.grid(row=0, column=0, pady=10, padx=460, sticky="nsew")
         
     # Buttons to navigate to another page    
         button = tk.Button(self, text="Products", command=master.show_productsPage)
-        button.grid(row=1, column=0, pady=0, padx=400, sticky="nsew")
+        button.grid(row=1, column=0, pady=0, padx=460, sticky="nsew")
 
         button = tk.Button(self, text="Inventory", command=master.show_inventoryPage)
-        button.grid(row=2, column=0, pady=0, padx=400, sticky="nsew")
+        button.grid(row=2, column=0, pady=0, padx=460, sticky="nsew")
 
 class ProductsPage(tk.Frame):
     def __init__(self, master):
@@ -58,21 +58,25 @@ class ProductsPage(tk.Frame):
 
 
         label = tk.Label (self, text= "Products", font=("Helvetica", 24, "bold"))  
-        label.grid(row=0, column=0, pady=0, padx=400, sticky="nsew")
+        label.grid(row=1, column=1, pady=0, padx=400, sticky="nsew")
         
         button = tk.Button(self, text="Main Menu", command=master.show_homePage)
-        button.grid(row=1, column=0, pady=0, padx=400, sticky="nsew")
+        button.grid(row=2, column=1, pady=0, padx=400, sticky="nsew")
 
         self.productsTable=tk.Frame(self)
-        self.productsTable.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+        self.productsTable.grid(row=6, column=1, columnspan=2, sticky="nsew", padx=10, pady=10)
 
         self.DisplayProducts("Supermarket.db")
 
         button_add_product = tk.Button(self, text="Add Product", command=self.addProductsWindow)
-        button_add_product.grid(row=1, column=1, pady=0, padx=10, sticky="nsew")
+        button_add_product.grid(row=3, column=2, pady=0, padx=10, sticky="nsew")
 
         button_delete_product = tk.Button(self, text="Delete Product", fg="red", command=self.deleteProduct)
-        button_delete_product.grid(row=1, column=2, pady=0, padx=0, sticky="nsew")
+        button_delete_product.grid(row=4, column=2, pady=0, padx=10, sticky="nsew")
+
+        self.input_field_search_bar = tk.Entry(self)
+        self.input_field_search_bar.bind("<Return>", self.search_product)
+        self.input_field_search_bar.grid(row=5, column=1, columnspan=2, pady=10, padx=10, sticky="ew")
 
 # Function to display the Products
     def DisplayProducts(self, db_file):
@@ -182,7 +186,7 @@ class ProductsPage(tk.Frame):
         # destroy current windows and reopen to refresh pages
                     self.productsTable.destroy()
                     self.productsTable=tk.Frame(self)
-                    self.productsTable.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+                    self.productsTable.grid(row=6, column=1, columnspan=2, sticky="nsew", padx=10, pady=10)
                     self.DisplayProducts("Supermarket.db")
                 except Exception as e:
                     tk.messagebox.showerror("Error", str(e))
@@ -213,6 +217,46 @@ class ProductsPage(tk.Frame):
 
         self.DisplayProducts("Supermarket.db")  # refresh the table
 
+
+    def search_product(self, event=None):
+        search_input = self.input_field_search_bar.get().strip().lower()
+        
+        # if search field is empty return the current table in db
+        if search_input == "":
+            self.DisplayProducts("Supermarket.db")
+        else:
+            cursor.execute("""
+            SELECT 
+                Products.product_id, 
+                Products.product_name, 
+                Products.price AS price, 
+                Categories.category_name, 
+                Categories.department
+            FROM Products
+            JOIN Categories 
+                ON Products.category_id = Categories.category_id
+            WHERE Products.product_name LIKE ? COLLATE NOCASE
+                OR Categories.category_name LIKE ? COLLATE NOCASE
+                OR Categories.department LIKE ? COLLATE NOCASE
+            """,
+            ('%' + search_input + '%','%' + search_input + '%', '%' + search_input + '%'))
+            rows = cursor.fetchall()
+            self.displaySearchResults(rows)
+
+    # display the filtered table
+    def displaySearchResults(self, rows):
+        for widget in self.productsTable.winfo_children():
+            widget.destroy()
+            
+        columns = [description[0] for description in cursor.description]
+        self.tree = ttk.Treeview(self.productsTable, columns=columns, show="headings")
+        for col in columns:
+            self.tree.heading(col, text=col)
+            self.tree.column(col, anchor="center")
+            
+        for row in rows:
+            self.tree.insert("", "end", values=row)
+        self.tree.pack(pady=0, padx=0, expand=True, fill="both")
 
 class InventoryPage(tk.Frame):
     def __init__(self, master):
