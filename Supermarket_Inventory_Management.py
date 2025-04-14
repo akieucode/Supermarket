@@ -88,7 +88,7 @@ class ProductsPage(tk.Frame):
         con = sqlite3.connect(db_file)  
         cursor = con.cursor()
 
-    # get all column names from Products table
+    # get all column names from Products and Categories table (join)
         cursor.execute("""
             SELECT 
                 Products.product_id, 
@@ -262,12 +262,115 @@ class InventoryPage(tk.Frame):
     def __init__(self, master):
         super().__init__(master)
         label = tk.Label (self, text= "Inventory", font=("Helvetica", 24, "bold"))
-        label.grid(row=0, column=0, pady=10, padx=400, sticky="nsew")
+        label.grid(row=1, column=1, pady=10, padx=460, sticky="nsew")
         
         button = tk.Button(self, text="Main Menu", command=master.show_homePage)
-        button.grid(row=1, column=0, pady=0, padx=400, sticky="nsew")
+        button.grid(row=2, column=1, pady=0, padx=460, sticky="nsew")
+
+        self.inventoryTable=tk.Frame(self)
+        self.inventoryTable.grid(row=6, column=1, sticky="nsew", padx=10, pady=10)
+
+        self.displayInventory("Supermarket.db")
+
+        button_update_quantity = tk.Button(self, text="Update Quantity", command=self.updateQuantityWindow)
+        button_update_quantity.grid(row=3, column=1, pady=0, padx=0, sticky="w")
+
+    def displayInventory(self, db_file):
+    # clear old content for any changes in database
+        for widget in self.inventoryTable.winfo_children():
+            widget.destroy()
+
+    # connect to database and create pointer to call SQL queries
+        con = sqlite3.connect(db_file)  
+        cursor = con.cursor()
+
+    # get all column names from Inventory and Products table (join)
+        cursor.execute("""
+            SELECT
+                Inventory.inventory_id,
+                Inventory.product_id,
+                Products.product_name,
+                Products.price,
+                Inventory.quantity
+            FROM Inventory
+            JOIN Products
+                ON Inventory.product_id = Products.product_id
+        """)
+
+    # get rows from the Products table, store data into list of tuples
+        rows = cursor.fetchall()
+
+    # cursor.description is a list of tuples:
+        columns = ['inventory_id', 'product_id', 'product_name', 'price', 'quantity']
         
-        
+    # create treeview widget
+        self.tree = ttk.Treeview(self.inventoryTable, columns=columns, show="headings")
+        self.tree.column("inventory_id", width=175, anchor="center")
+        self.tree.column("product_id", width=175, anchor="center")
+        self.tree.column("product_name", width=175, anchor="center")
+        self.tree.column("price", width=175, anchor="center")
+        self.tree.column("quantity", width=175, anchor="center")
+
+        for col in columns:
+            self.tree.heading(col, text=col)
+
+    # column headers
+        for col in columns:
+            self.tree.heading(col, text=col)
+            self.tree.column(col, anchor="center")
+    # insert rows, data from database
+        for row in rows:
+            self.tree.insert("", "end", values=row)
+
+        con.close() # close connection
+
+    # display the table
+        self.tree.pack(pady=0, padx=0)
+
+    def updateQuantityWindow(self):
+    # open separate window on top of current    
+        update_quantity_window = tk.Toplevel(self)
+        update_quantity_window.title("Update Quantity")
+        update_quantity_window.geometry("200x100")
+
+        tk.Label(update_quantity_window, text="Update Quantity").pack(pady=5)
+        quantity_input = tk.Entry(update_quantity_window)
+        quantity_input.pack()
+
+
+        def updateQuantity():
+            selected_item = self.tree.selection()
+            if not selected_item:
+                return
+            
+            item = self.tree.item(selected_item[0])  # get the data values from the first selected item
+            inventory_id = item['values'][0]      # get the tuple of the data values in the first column (where inventory_id is stored)
+
+            new_quantity = quantity_input.get()
+            if not new_quantity.isdigit():  # check if input is a number
+                messagebox.showerror("Invalid: please enter a number")
+                return
+            else:
+                con = sqlite3.connect("Supermarket.db")
+                cursor = con.cursor()
+                cursor.execute("""
+                    UPDATE Inventory
+                    SET quantity = ?
+                    WHERE inventory_id = ?
+                """, ((new_quantity), inventory_id))
+                con.commit()
+                con.close()
+
+                update_quantity_window.destroy()
+
+            # destroy current windows and reopen to refresh pages
+                self.inventoryTable.destroy()
+                self.inventoryTable=tk.Frame(self)
+                self.inventoryTable.grid(row=6, column=1, columnspan=2, sticky="nsew", padx=10, pady=10)
+                self.displayInventory("Supermarket.db")  
+        tk.Button(update_quantity_window, text="Update", command=updateQuantity).pack(pady=10)
+                
+
 
 #run the Tkinter app    
 if __name__ == "__main__":
