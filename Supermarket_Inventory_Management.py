@@ -20,6 +20,7 @@ class App(tk.Tk):
         self.productsTable = tk.Frame(self)
         
         self.inventoryPage = InventoryPage(self)
+        self.inventoryTable = tk.Frame(self)
 
 # Display homePage first
         self.homePage.grid(row=0, column=0, sticky="nsew")  
@@ -37,8 +38,10 @@ class App(tk.Tk):
         self.inventoryPage.grid(row=0, column=0, sticky="nsew")
         self.homePage.grid_forget()
 
-    
-     
+# function to refresh inventory after adding a product from ProductsPage and it updates inventory
+    def refresh_inventory(self):
+        self.inventoryPage.displayInventory("Supermarket.db")
+
 class HomePage(tk.Frame):
     def __init__(self, master):
         super().__init__(master)
@@ -56,27 +59,25 @@ class ProductsPage(tk.Frame):
     def __init__(self, master):
         super().__init__(master)
 
-
         label = tk.Label (self, text= "Products", font=("Helvetica", 24, "bold"))  
-        label.grid(row=1, column=1, pady=0, padx=400, sticky="nsew")
+        label.grid(row=1, column=1, pady=10, padx=450, sticky="nsew")
         
         button = tk.Button(self, text="Main Menu", command=master.show_homePage)
-        button.grid(row=2, column=1, pady=0, padx=400, sticky="nsew")
+        button.grid(row=2, column=1, pady=0, padx=450, sticky="nsew")
 
         self.productsTable=tk.Frame(self)
-        self.productsTable.grid(row=6, column=1, columnspan=2, sticky="nsew", padx=10, pady=10)
-
+        self.productsTable.grid(row=6, column=1, sticky="nsew", padx=10, pady=10)
         self.DisplayProducts("Supermarket.db")
 
         button_add_product = tk.Button(self, text="Add Product", command=self.addProductsWindow)
-        button_add_product.grid(row=3, column=2, pady=0, padx=10, sticky="nsew")
+        button_add_product.grid(row=3, column=1, pady=0, padx=80, sticky="e")
 
         button_delete_product = tk.Button(self, text="Delete Product", fg="red", command=self.deleteProduct)
-        button_delete_product.grid(row=4, column=2, pady=0, padx=10, sticky="nsew")
+        button_delete_product.grid(row=4, column=1, pady=5, padx=80, sticky="e")
 
         self.input_field_search_bar = tk.Entry(self)
         self.input_field_search_bar.bind("<Return>", self.search_product)
-        self.input_field_search_bar.grid(row=5, column=1, columnspan=2, pady=10, padx=10, sticky="ew")
+        self.input_field_search_bar.grid(row=5, column=1, pady=0, padx=80, sticky="ns")
 
 # Function to display the Products
     def DisplayProducts(self, db_file):
@@ -93,7 +94,7 @@ class ProductsPage(tk.Frame):
             SELECT 
                 Products.product_id, 
                 Products.product_name, 
-                Products.price AS price, 
+                Products.price, 
                 Categories.category_name, 
                 Categories.department
             FROM Products
@@ -109,6 +110,11 @@ class ProductsPage(tk.Frame):
         
     # create treeview widget
         self.tree = ttk.Treeview(self.productsTable, columns=columns, show="headings")
+        self.tree.column("product_id", width=175, anchor="center")
+        self.tree.column("product_name", width=175, anchor="center")
+        self.tree.column("price", width=175, anchor="center")
+        self.tree.column("category_name", width=175, anchor="center")
+        self.tree.column("department", width=175, anchor="center")
 
     # column headers
         for col in columns:
@@ -121,7 +127,7 @@ class ProductsPage(tk.Frame):
         con.close() # close connection
 
     # display the table
-        self.tree.pack(pady=0, padx=0, expand=True, fill="both")
+        self.tree.pack(pady=0, padx=0)
 
     def addProductsWindow(self):
     # open separate window on top of current    
@@ -171,23 +177,38 @@ class ProductsPage(tk.Frame):
                         con.commit()
 
                 # fetch new category id
-                        cursor.execute("SELECT category_id FROM Categories WHERE category_name = ?", (category_name,))
-                        category_id = cursor.fetchone()[0]  # get the only result, extract tuple and hold the actual category_id value
+                    cursor.execute("SELECT category_id FROM Categories WHERE category_name = ?", (category_name,))
+                    category_id = cursor.fetchone()[0]  # get the only result, extract tuple and hold the actual category_id value
                 # insert new product into Products table that links with the category_id        
                     cursor.execute(
                         "INSERT INTO Products (product_name, price, category_id) VALUES (?,?,?)",
                         (product_name, float(price), category_id)
                     )
                     con.commit()
-                    con.close()
 
+                # fetch product_id
+                    cursor.execute(
+                        "SELECT product_id FROM Products WHERE product_name = ?", (product_name,))
+                    result_product_id = cursor.fetchone()
+                    if result_product_id:
+                        product_id = result_product_id[0]
+
+                    # insert the product_id and set quantity at 0 in the Inventory Table    
+                        cursor.execute(
+                            "INSERT INTO Inventory (product_id, quantity) VALUES (?, ?)",
+                            (product_id, 0)
+                        )
+                        con.commit()
+                    con.close()
                     add_product_window.destroy()
+                    app.refresh_inventory()
 
         # destroy current windows and reopen to refresh pages
                     self.productsTable.destroy()
-                    self.productsTable=tk.Frame(self)
-                    self.productsTable.grid(row=6, column=1, columnspan=2, sticky="nsew", padx=10, pady=10)
+                    self.productsTable=tk.Frame(self)           
+                    self.productsTable.grid(row=6, column=1, sticky="nsew", padx=10, pady=10)
                     self.DisplayProducts("Supermarket.db")
+
                 except Exception as e:
                     tk.messagebox.showerror("Error", str(e))
             else:
@@ -208,15 +229,18 @@ class ProductsPage(tk.Frame):
         if not confirm: # do nothing and close the message box
             return
 
-        # delete data from the db
+    # delete data from the db
         con = sqlite3.connect("Supermarket.db")
         cursor = con.cursor()
+    # delete product from product table
         cursor.execute("DELETE FROM Products WHERE product_id = ?", (product_id,))
+    # delete product from inventory table
+        cursor.execute("DELETE FROM Inventory WHERE product_id = ?", (product_id,))
         con.commit()
         con.close()
 
         self.DisplayProducts("Supermarket.db")  # refresh the table
-
+        app.refresh_inventory() # refresh InventoryPage table
 
     def search_product(self, event=None):
         search_input = self.input_field_search_bar.get().strip().lower()
@@ -229,7 +253,7 @@ class ProductsPage(tk.Frame):
             SELECT 
                 Products.product_id, 
                 Products.product_name, 
-                Products.price AS price, 
+                Products.price, 
                 Categories.category_name, 
                 Categories.department
             FROM Products
@@ -250,13 +274,19 @@ class ProductsPage(tk.Frame):
             
         columns = [description[0] for description in cursor.description]
         self.tree = ttk.Treeview(self.productsTable, columns=columns, show="headings")
+        self.tree.column("product_id", width=175, anchor="center")
+        self.tree.column("product_name", width=175, anchor="center")
+        self.tree.column("price", width=175, anchor="center")
+        self.tree.column("category_name", width=175, anchor="center")
+        self.tree.column("department", width=175, anchor="center")
+
         for col in columns:
             self.tree.heading(col, text=col)
             self.tree.column(col, anchor="center")
             
         for row in rows:
             self.tree.insert("", "end", values=row)
-        self.tree.pack(pady=0, padx=0, expand=True, fill="both")
+        self.tree.pack(pady=0, padx=0)
 
 class InventoryPage(tk.Frame):
     def __init__(self, master):
@@ -268,12 +298,12 @@ class InventoryPage(tk.Frame):
         button.grid(row=2, column=1, pady=0, padx=460, sticky="nsew")
 
         self.inventoryTable=tk.Frame(self)
-        self.inventoryTable.grid(row=6, column=1, sticky="nsew", padx=10, pady=10)
+        self.inventoryTable.grid(row=6, column=1, sticky="n", padx=10, pady=60)
 
         self.displayInventory("Supermarket.db")
 
         button_update_quantity = tk.Button(self, text="Update Quantity", command=self.updateQuantityWindow)
-        button_update_quantity.grid(row=3, column=1, pady=0, padx=0, sticky="w")
+        button_update_quantity.grid(row=5, column=1, pady=0, padx=80, sticky="e")
 
     def displayInventory(self, db_file):
     # clear old content for any changes in database
@@ -348,7 +378,7 @@ class InventoryPage(tk.Frame):
 
             new_quantity = quantity_input.get()
             if not new_quantity.isdigit():  # check if input is a number
-                messagebox.showerror("Invalid: please enter a number")
+                messagebox.showerror("Invalid", "Please enter a number.")
                 return
             else:
                 con = sqlite3.connect("Supermarket.db")
@@ -374,5 +404,5 @@ class InventoryPage(tk.Frame):
 
 #run the Tkinter app    
 if __name__ == "__main__":
-    app = App() 
+    app = App() # app is the root
     app.mainloop()
