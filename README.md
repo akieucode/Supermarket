@@ -1,2 +1,0 @@
-# Supermarket
-Supermarket inventory management
